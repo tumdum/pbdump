@@ -1,0 +1,4 @@
+package pbdump;
+
+message EmptyMessage {
+}
