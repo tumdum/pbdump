@@ -32,6 +32,52 @@ func TestMessageWithRepeatedInt(t *testing.T) {
 	}
 }
 
+func TestMessageWithString(t *testing.T) {
+	name := "name"
+	msg := MessageWithString{Name: &name}
+	buf := MustMarshal(&msg)
+	if m, err := Dump(buf); err != nil {
+		t.Fatalf("Failed to dump: '%v'", err)
+	} else if v, ok := m[1]; !ok {
+		t.Fatalf("Missing required field '1': '%v'", m)
+	} else if !HasStrings(v, name) {
+		t.Fatalf("Incorrect value, expected '%s', got '%s'", name, v)
+	}
+}
+
+func TestMessageWithEmbeddedRepeatedMessageWithString(t *testing.T) {
+	name1 := "name1"
+	msg1 := MessageWithString{Name: &name1}
+	name2 := "name2"
+	msg2 := MessageWithString{Name: &name2}
+	msg := MessageWithEmbeddedRepeatedMessageWithString{
+		Messages: []*MessageWithString{
+			&msg1, &msg2,
+		},
+	}
+	buf := MustMarshal(&msg)
+	m, err := Dump(buf)
+	if err != nil {
+		t.Fatalf("Failed to dump: '%v'", err)
+	}
+	v, ok := m[1]
+	if !ok {
+		t.Fatalf("Missing filed repeated field '1': '%v'", m)
+	} else if len(v) != 2 {
+		t.Fatalf("Expected to have to repeated messages, got: '%d' (%v)", len(v), v)
+	}
+	if v0, ok := v[0].(StringerMessage); !ok {
+		t.Fatalf("Expected message, found '%#v'", v[0])
+	} else if !HasStrings(v0[1], name1) {
+		t.Fatal("First message expected to have string '%v', got '%v'", name1, v0)
+	}
+	if v1, ok := v[1].(StringerMessage); !ok {
+		t.Fatalf("Expected message, found '%#v'", v[1])
+	} else if !HasStrings(v1[1], name2) {
+		t.Fatalf("Second message expected to have string '%v', got '%v'", name2, v1)
+	}
+}
+
 func HasVarints(actual StringerRepeated, expected ...uint64) bool {
 	if len(actual) != len(expected) {
 		return false
@@ -40,6 +86,20 @@ func HasVarints(actual StringerRepeated, expected ...uint64) bool {
 		if v, ok := actual[i].(StringerVarint); !ok {
 			return false
 		} else if uint64(v) != expected[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func HasStrings(actual StringerRepeated, expected ...string) bool {
+	if len(actual) != len(expected) {
+		return false
+	}
+	for i, _ := range actual {
+		if v, ok := actual[i].(StringerString); !ok {
+			return false
+		} else if string(v) != expected[i] {
 			return false
 		}
 	}

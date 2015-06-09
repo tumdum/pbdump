@@ -10,3 +10,11 @@ message MessageWithInt {
 message MessageWithRepeatedInt {
     repeated int32 ids = 1;
 }
+
+message MessageWithString {
+    required string name = 1;
+}
+
+message MessageWithEmbeddedRepeatedMessageWithString {
+    repeated MessageWithString messages = 1;
+}

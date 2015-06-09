@@ -1,6 +1,7 @@
 package pbdump
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -10,8 +11,12 @@ import (
 type decoder func(io.ByteReader) (fmt.Stringer, error)
 
 var (
-	decoders = []decoder{decodeVarint}
+	decoders []decoder
 )
+
+func init() {
+	decoders = []decoder{decodeVarint, nil, decodeLengthDelimited}
+}
 
 type key struct {
 	Tag, Type int
@@ -34,13 +39,31 @@ type StringerRepeated []fmt.Stringer
 func (s StringerRepeated) String() string {
 	tmp := make([]string, len(s))
 	for i, v := range s {
-		tmp[i] = v.String()
+		tmp[i] = "'" + v.String() + "'"
 	}
-	return "{" + strings.Join(tmp, ",") + "}"
+	return "{" + strings.Join(tmp, ";") + "}"
+}
+
+type StringerMessage map[int]StringerRepeated
+
+func (s StringerMessage) String() string {
+	buf := ""
+	for k, v := range s {
+		buf += fmt.Sprint(k) + " -> " + fmt.Sprint(v) + ", "
+	}
+	return buf
 }
 
 func Dump(r io.ByteReader) (map[int]StringerRepeated, error) {
-	m := make(map[int]StringerRepeated)
+	if m, err := decodeMessage(r); err != nil {
+		return nil, err
+	} else {
+		return m.(StringerMessage), nil
+	}
+}
+
+func decodeMessage(r io.ByteReader) (fmt.Stringer, error) {
+	m := make(StringerMessage)
 	for {
 		k, err := readKey(r)
 		if err == io.EOF {
@@ -69,10 +92,53 @@ func decodeVarint(r io.ByteReader) (fmt.Stringer, error) {
 	}
 }
 
+type ByteReaderReader struct {
+	r io.ByteReader
+}
+
+func (r *ByteReaderReader) Read(b []byte) (int, error) {
+	for i := 0; i < len(b); i++ {
+		c, err := r.r.ReadByte()
+		if err != nil {
+			return i, err
+		}
+		b[i] = c
+	}
+	return len(b), nil
+}
+
+func decodeLengthDelimited(r io.ByteReader) (fmt.Stringer, error) {
+	if l, err := binary.ReadUvarint(r); err != nil {
+		return nil, err
+	} else {
+		b := make([]byte, l)
+		fullReader := ByteReaderReader{r}
+		if n, err := fullReader.Read(b); err != nil {
+			return nil, err
+		} else if uint64(n) != l {
+			return nil, fmt.Errorf("Too little data")
+		}
+		buf := bytes.NewBuffer(b)
+		if msg, err := decodeMessage(buf); err != nil {
+			return StringerString(string(b)), nil
+		} else {
+			return msg, nil
+		}
+	}
+}
+
 func readKey(r io.ByteReader) (key, error) {
 	n, err := binary.ReadUvarint(r)
 	if err != nil {
 		return key{}, err
 	}
-	return key{int(n >> 3), int(n & 0x7)}, nil
+	k := key{int(n >> 3), int(n & 0x7)}
+	if !isSupportedWireType(k.Type) {
+		return key{}, fmt.Errorf("Unsupported wire type '%d'", k.Type)
+	}
+	return k, nil
+}
+
+func isSupportedWireType(t int) bool {
+	return (t >= 0) && (t < len(decoders)) && (decoders[t] != nil)
 }
