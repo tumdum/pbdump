@@ -2,3 +2,7 @@ package pbdump;
 
 message EmptyMessage {
 }
+
+message MessageWithInt {
+    required int32 id = 1;
+}

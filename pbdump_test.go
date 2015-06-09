@@ -2,24 +2,38 @@ package pbdump
 
 import (
 	"bytes"
-	"github.com/golang/protobuf/proto"
+	"fmt"
 	"testing"
-)
 
-func TestReadVarintOfOneByte(t *testing.T) {
-	for i := byte(0); i != 128; i++ {
-		b := bytes.NewBuffer([]byte{i})
-		v, err := readVarint(b)
-		if err != nil {
-			t.Fatalf("Failed to decode '%d': %s", i, err)
-		}
-		if v != uint64(i) {
-			t.Fatalf("Expected '%d' got '%d'", i, v)
-		}
-	}
-}
+	"github.com/golang/protobuf/proto"
+)
 
 func TestFoo(t *testing.T) {
 	var msg EmptyMessage
-	proto.Marshal(&msg)
+	b, _ := proto.Marshal(&msg)
+	buf := bytes.NewBuffer(b)
+	m, _ := Dump(buf)
+	fmt.Println(m)
+}
+
+func TestMessageWithInt(t *testing.T) {
+	msg := MessageWithInt{Id: proto.Int32(42)}
+	b, err := proto.Marshal(&msg)
+	if err != nil {
+		t.Fail()
+	}
+	buf := bytes.NewBuffer(b)
+	m, err := Dump(buf)
+	if err != nil {
+		t.Fatalf("Failed to dump: '%v'", err)
+	}
+	v, ok := m[1]
+	if !ok {
+		t.Fatalf("Missing required field '1': '%v'", m)
+	}
+	if n, ok := v.(StringerVarint); !ok {
+		t.Fatalf("Incorrect type under key: '%v'", v)
+	} else if uint64(n) != 42 {
+		t.Fatalf("Incorrect value under key: '%v'", n)
+	}
 }
