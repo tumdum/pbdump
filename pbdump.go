@@ -15,7 +15,7 @@ var (
 )
 
 func init() {
-	decoders = []decoder{decodeVarint, nil, decodeLengthDelimited}
+	decoders = []decoder{decodeVarint, decodeDouble, decodeLengthDelimited}
 }
 
 type key struct {
@@ -52,6 +52,12 @@ func (s StringerMessage) String() string {
 		buf += fmt.Sprint(k) + " -> " + fmt.Sprint(v) + ", "
 	}
 	return buf
+}
+
+type StringerDouble float64
+
+func (s StringerDouble) String() string {
+	return fmt.Sprint(float64(s))
 }
 
 func Dump(r io.ByteReader) (StringerMessage, error) {
@@ -124,6 +130,16 @@ func decodeLengthDelimited(r io.ByteReader) (fmt.Stringer, error) {
 		} else {
 			return msg, nil
 		}
+	}
+}
+
+func decodeDouble(r io.ByteReader) (fmt.Stringer, error) {
+	fullReader := ByteReaderReader{r}
+	var d float64
+	if err := binary.Read(&fullReader, binary.LittleEndian, &d); err != nil {
+		return nil, err
+	} else {
+		return StringerDouble(d), nil
 	}
 }
 

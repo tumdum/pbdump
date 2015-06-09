@@ -78,6 +78,18 @@ func TestMessageWithEmbeddedRepeatedMessageWithString(t *testing.T) {
 	}
 }
 
+func TestMessageWithDouble(t *testing.T) {
+	d := float64(3.14159)
+	msg := MessageWithDouble{D: &d}
+	buf := MustMarshal(&msg)
+	if m, err := Dump(buf); err != nil {
+		t.Fatalf("Failed to dump: '%v'", err)
+	} else if v, ok := m[1]; !ok {
+		t.Fatalf("Missing required field '1': '%v'", m)
+	} else if !HasDouble(v, d) {
+		t.Fatalf("Incorrect value, expected '%v', got '%v'", d, v)
+	}
+}
 func HasVarints(actual StringerRepeated, expected ...uint64) bool {
 	if len(actual) != len(expected) {
 		return false
@@ -100,6 +112,20 @@ func HasStrings(actual StringerRepeated, expected ...string) bool {
 		if v, ok := actual[i].(StringerString); !ok {
 			return false
 		} else if string(v) != expected[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func HasDouble(actual StringerRepeated, expected ...float64) bool {
+	if len(actual) != len(expected) {
+		return false
+	}
+	for i, _ := range actual {
+		if v, ok := actual[i].(StringerDouble); !ok {
+			return false
+		} else if float64(v) != expected[i] {
 			return false
 		}
 	}

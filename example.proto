@@ -18,3 +18,7 @@ message MessageWithString {
 message MessageWithEmbeddedRepeatedMessageWithString {
     repeated MessageWithString messages = 1;
 }
+
+message MessageWithDouble {
+    required double d = 1;
+}
