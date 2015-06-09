@@ -54,7 +54,7 @@ func (s StringerMessage) String() string {
 	return buf
 }
 
-func Dump(r io.ByteReader) (map[int]StringerRepeated, error) {
+func Dump(r io.ByteReader) (StringerMessage, error) {
 	if m, err := decodeMessage(r); err != nil {
 		return nil, err
 	} else {
