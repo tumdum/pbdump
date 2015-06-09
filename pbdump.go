@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"strings"
 )
 
 type decoder func(io.ByteReader) (fmt.Stringer, error)
@@ -28,8 +29,18 @@ func (s StringerVarint) String() string {
 	return fmt.Sprint(uint64(s))
 }
 
-func Dump(r io.ByteReader) (map[int]fmt.Stringer, error) {
-	m := make(map[int]fmt.Stringer)
+type StringerRepeated []fmt.Stringer
+
+func (s StringerRepeated) String() string {
+	tmp := make([]string, len(s))
+	for i, v := range s {
+		tmp[i] = v.String()
+	}
+	return "{" + strings.Join(tmp, ",") + "}"
+}
+
+func Dump(r io.ByteReader) (map[int]StringerRepeated, error) {
+	m := make(map[int]StringerRepeated)
 	for {
 		k, err := readKey(r)
 		if err == io.EOF {
@@ -41,7 +52,11 @@ func Dump(r io.ByteReader) (map[int]fmt.Stringer, error) {
 		if err != nil {
 			return nil, err
 		}
-		m[k.Tag] = v
+		if s, ok := m[k.Tag]; ok {
+			m[k.Tag] = append(s, v)
+		} else {
+			m[k.Tag] = StringerRepeated{v}
+		}
 	}
 	return m, nil
 }

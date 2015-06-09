@@ -6,3 +6,7 @@ message EmptyMessage {
 message MessageWithInt {
     required int32 id = 1;
 }
+
+message MessageWithRepeatedInt {
+    repeated int32 ids = 1;
+}
