@@ -37,7 +37,7 @@ func (m NamedMessageRepeated) String() string {
 	return fmt.Sprint([]NamedMessage(m))
 }
 
-func Apply(m StringerMessage, c Context) NamedMessage {
+func InjectNames(m StringerMessage, c Context) NamedMessage {
 	ret := make(map[string]fmt.Stringer)
 	for id, val := range m {
 		field, ok := c.Field(id)
@@ -48,11 +48,11 @@ func Apply(m StringerMessage, c Context) NamedMessage {
 			if field.Repeated {
 				r := make(NamedMessageRepeated, len(val))
 				for i, v := range val {
-					r[i] = Apply(v.(StringerMessage), field.Context)
+					r[i] = InjectNames(v.(StringerMessage), field.Context)
 				}
 				ret[field.Name] = r
 			} else {
-				ret[field.Name] = Apply(val[0].(StringerMessage), field.Context)
+				ret[field.Name] = InjectNames(val[0].(StringerMessage), field.Context)
 			}
 		} else {
 			if field.Repeated {

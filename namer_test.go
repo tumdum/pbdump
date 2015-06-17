@@ -17,7 +17,7 @@ func TestNamingOfMessageWithInt(t *testing.T) {
 		Name: "foo", Type: Int64,
 		Repeated: false, Context: nil,
 	}
-	out := Apply(m, c)
+	out := InjectNames(m, c)
 	if v, ok := out["foo"]; !ok {
 		t.Fatalf("No expected field: '%v'", out)
 	} else if i, ok := v.(StringerVarint); !ok {
@@ -37,7 +37,7 @@ func TestNamingOfMessageWithRepeatedInt(t *testing.T) {
 		Name: "foo", Type: Int64,
 		Repeated: true, Context: nil,
 	}
-	out := Apply(m, c)
+	out := InjectNames(m, c)
 	if v, ok := out["foo"]; !ok {
 		t.Fatalf("No expected field: '%v'", out)
 	} else if s, ok := v.(StringerRepeated); !ok {
@@ -80,7 +80,7 @@ func TestNamingOfMessageWithMessage(t *testing.T) {
 		Repeated: false, Context: &c2,
 	}
 
-	out := Apply(root, croot)
+	out := InjectNames(root, croot)
 
 	if v1, ok := out["m1"]; !ok {
 		t.Fatalf("Missing field m1: '%v'", out)
@@ -121,7 +121,7 @@ func TestNamingOfMessageWithRepeatedMessage(t *testing.T) {
 		Repeated: true, Context: &c1,
 	}
 
-	out := Apply(root, croot)
+	out := InjectNames(root, croot)
 	if submsg, ok := out["submsg"]; !ok {
 		t.Fatalf("Expected submsg got: '%v'", out)
 	} else if v, ok := submsg.(NamedMessageRepeated); !ok {
