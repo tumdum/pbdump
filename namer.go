@@ -2,27 +2,11 @@ package pbdump
 
 import "fmt"
 
-type Type int
-
-const (
-	Int32 Type = iota
-	Int64
-	Uint32
-	Uint64
-	Double
-	String
-	Message
-)
-
-type Field struct {
-	Name     string
-	Type     Type
-	Repeated bool
-	Context  Context
-}
-
 type Context interface {
-	Field(id int) (Field, bool)
+	Has(id int) bool
+	Name(id int) string
+	IsRepeated(id int) bool
+	Context(id int) Context
 }
 
 type NamedMessage map[string]fmt.Stringer
@@ -40,25 +24,24 @@ func (m NamedMessageRepeated) String() string {
 func InjectNames(m StringerMessage, c Context) NamedMessage {
 	ret := make(map[string]fmt.Stringer)
 	for id, val := range m {
-		field, ok := c.Field(id)
-		if !ok {
+		if !c.Has(id) {
 			continue
 		}
-		if field.Type == Message {
-			if field.Repeated {
+		if c.Context(id) != nil {
+			if c.IsRepeated(id) {
 				r := make(NamedMessageRepeated, len(val))
 				for i, v := range val {
-					r[i] = InjectNames(v.(StringerMessage), field.Context)
+					r[i] = InjectNames(v.(StringerMessage), c.Context(id))
 				}
-				ret[field.Name] = r
+				ret[c.Name(id)] = r
 			} else {
-				ret[field.Name] = InjectNames(val[0].(StringerMessage), field.Context)
+				ret[c.Name(id)] = InjectNames(val[0].(StringerMessage), c.Context(id))
 			}
 		} else {
-			if field.Repeated {
-				ret[field.Name] = val
+			if c.IsRepeated(id) {
+				ret[c.Name(id)] = val
 			} else {
-				ret[field.Name] = val[0]
+				ret[c.Name(id)] = val[0]
 			}
 		}
 	}

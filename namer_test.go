@@ -2,22 +2,50 @@ package pbdump
 
 import "testing"
 
+type Field struct {
+	name       string
+	isRepeated bool
+	context    Context
+}
+
+func (f Field) Name() string {
+	return f.name
+}
+
+func (f Field) IsRepeated() bool {
+	return f.isRepeated
+}
+
+func (f Field) Context() Context {
+	return f.context
+}
+
 type SimpleContext map[int]Field
 
-func (c SimpleContext) Field(id int) (Field, bool) {
-	v, ok := c[id]
-	return v, ok
+func (c SimpleContext) Has(id int) bool {
+	_, ok := c[id]
+	return ok
+}
+
+func (c SimpleContext) Name(id int) string {
+	return c[id].name
+}
+
+func (c SimpleContext) IsRepeated(id int) bool {
+	return c[id].isRepeated
+}
+
+func (c SimpleContext) Context(id int) Context {
+	return c[id].context
 }
 
 func TestNamingOfMessageWithInt(t *testing.T) {
 	m := make(StringerMessage)
 	m[1] = StringerRepeated{StringerVarint(42)}
 	c := make(SimpleContext)
-	c[1] = Field{
-		Name: "foo", Type: Int64,
-		Repeated: false, Context: nil,
-	}
+	c[1] = Field{name: "foo", isRepeated: false, context: nil}
 	out := InjectNames(m, c)
+
 	if v, ok := out["foo"]; !ok {
 		t.Fatalf("No expected field: '%v'", out)
 	} else if i, ok := v.(StringerVarint); !ok {
@@ -34,8 +62,7 @@ func TestNamingOfMessageWithRepeatedInt(t *testing.T) {
 	}
 	c := make(SimpleContext)
 	c[2] = Field{
-		Name: "foo", Type: Int64,
-		Repeated: true, Context: nil,
+		name: "foo", isRepeated: true, context: nil,
 	}
 	out := InjectNames(m, c)
 	if v, ok := out["foo"]; !ok {
@@ -64,20 +91,16 @@ func TestNamingOfMessageWithMessage(t *testing.T) {
 	croot := make(SimpleContext)
 
 	c1[1] = Field{
-		Name: "id", Type: Uint64,
-		Repeated: false, Context: nil,
+		name: "id", isRepeated: false, context: nil,
 	}
 	c2[1] = Field{
-		Name: "field", Type: String,
-		Repeated: false, Context: nil,
+		name: "field", isRepeated: false, context: nil,
 	}
 	croot[1] = Field{
-		Name: "m1", Type: Message,
-		Repeated: false, Context: &c1,
+		name: "m1", isRepeated: false, context: &c1,
 	}
 	croot[2] = Field{
-		Name: "m2", Type: Message,
-		Repeated: false, Context: &c2,
+		name: "m2", isRepeated: false, context: &c2,
 	}
 
 	out := InjectNames(root, croot)
@@ -111,14 +134,12 @@ func TestNamingOfMessageWithRepeatedMessage(t *testing.T) {
 
 	c1 := make(SimpleContext)
 	c1[1] = Field{
-		Name: "id", Type: Uint64,
-		Repeated: false, Context: nil,
+		name: "id", isRepeated: false, context: nil,
 	}
 
 	croot := make(SimpleContext)
 	croot[1] = Field{
-		Name: "submsg", Type: Message,
-		Repeated: true, Context: &c1,
+		name: "submsg", isRepeated: true, context: &c1,
 	}
 
 	out := InjectNames(root, croot)
