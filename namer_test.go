@@ -14,7 +14,7 @@ func TestNamingOfMessageWithInt(t *testing.T) {
 	m[1] = StringerRepeated{StringerVarint(42)}
 	c := make(SimpleContext)
 	c[1] = Field{
-		Name: "foo", Type: Int64,
+		Name: "foo", Kind: Simple,
 		Repeated: false, Context: nil,
 	}
 	out := InjectNames(m, c)
@@ -34,7 +34,7 @@ func TestNamingOfMessageWithRepeatedInt(t *testing.T) {
 	}
 	c := make(SimpleContext)
 	c[2] = Field{
-		Name: "foo", Type: Int64,
+		Name: "foo", Kind: Simple,
 		Repeated: true, Context: nil,
 	}
 	out := InjectNames(m, c)
@@ -64,19 +64,19 @@ func TestNamingOfMessageWithMessage(t *testing.T) {
 	croot := make(SimpleContext)
 
 	c1[1] = Field{
-		Name: "id", Type: Uint64,
+		Name: "id", Kind: Simple,
 		Repeated: false, Context: nil,
 	}
 	c2[1] = Field{
-		Name: "field", Type: String,
+		Name: "field", Kind: Simple,
 		Repeated: false, Context: nil,
 	}
 	croot[1] = Field{
-		Name: "m1", Type: Message,
+		Name: "m1", Kind: Complex,
 		Repeated: false, Context: &c1,
 	}
 	croot[2] = Field{
-		Name: "m2", Type: Message,
+		Name: "m2", Kind: Complex,
 		Repeated: false, Context: &c2,
 	}
 
@@ -111,13 +111,13 @@ func TestNamingOfMessageWithRepeatedMessage(t *testing.T) {
 
 	c1 := make(SimpleContext)
 	c1[1] = Field{
-		Name: "id", Type: Uint64,
+		Name: "id", Kind: Simple,
 		Repeated: false, Context: nil,
 	}
 
 	croot := make(SimpleContext)
 	croot[1] = Field{
-		Name: "submsg", Type: Message,
+		Name: "submsg", Kind: Complex,
 		Repeated: true, Context: &c1,
 	}
 

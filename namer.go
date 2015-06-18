@@ -2,21 +2,16 @@ package pbdump
 
 import "fmt"
 
-type Type int
+type Kind int
 
 const (
-	Int32 Type = iota
-	Int64
-	Uint32
-	Uint64
-	Double
-	String
-	Message
+	Complex Kind = iota
+	Simple
 )
 
 type Field struct {
 	Name     string
-	Type     Type
+	Kind     Kind
 	Repeated bool
 	Context  Context
 }
@@ -44,7 +39,7 @@ func InjectNames(m StringerMessage, c Context) NamedMessage {
 		if !ok {
 			continue
 		}
-		if field.Type == Message {
+		if field.Kind == Complex {
 			if field.Repeated {
 				r := make(NamedMessageRepeated, len(val))
 				for i, v := range val {
