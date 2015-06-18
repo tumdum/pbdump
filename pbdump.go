@@ -44,11 +44,14 @@ func (s StringerRepeated) String() string {
 	return "{" + strings.Join(tmp, ";") + "}"
 }
 
-type StringerMessage map[int]StringerRepeated
+type StringerMessage struct {
+	attributes map[int]StringerRepeated
+	rawPayload []byte
+}
 
 func (s StringerMessage) String() string {
 	buf := ""
-	for k, v := range s {
+	for k, v := range s.attributes {
 		buf += fmt.Sprint(k) + " -> " + fmt.Sprint(v) + ", "
 	}
 	return buf
@@ -62,14 +65,14 @@ func (s StringerDouble) String() string {
 
 func Dump(r io.ByteReader) (StringerMessage, error) {
 	if m, err := decodeMessage(r); err != nil {
-		return nil, err
+		return StringerMessage{}, err
 	} else {
 		return m.(StringerMessage), nil
 	}
 }
 
 func decodeMessage(r io.ByteReader) (fmt.Stringer, error) {
-	m := make(StringerMessage)
+	m := StringerMessage{make(map[int]StringerRepeated), nil}
 	for {
 		k, err := readKey(r)
 		if err == io.EOF {
@@ -81,10 +84,10 @@ func decodeMessage(r io.ByteReader) (fmt.Stringer, error) {
 		if err != nil {
 			return nil, err
 		}
-		if s, ok := m[k.Tag]; ok {
-			m[k.Tag] = append(s, v)
+		if s, ok := m.attributes[k.Tag]; ok {
+			m.attributes[k.Tag] = append(s, v)
 		} else {
-			m[k.Tag] = StringerRepeated{v}
+			m.attributes[k.Tag] = StringerRepeated{v}
 		}
 	}
 	return m, nil

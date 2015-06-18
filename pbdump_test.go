@@ -13,7 +13,7 @@ func TestMessageWithInt(t *testing.T) {
 	buf := MustMarshal(&msg)
 	if m, err := Dump(buf); err != nil {
 		t.Fatalf("Failed to dump: '%v'", err)
-	} else if v, ok := m[1]; !ok {
+	} else if v, ok := m.attributes[1]; !ok {
 		t.Fatalf("Missing required field '1': '%v'", m)
 	} else if !HasVarints(v, 42) {
 		t.Fatalf("Incorrect value for field, expected '%v', got '%v'", 42, v)
@@ -25,7 +25,7 @@ func TestMessageWithRepeatedInt(t *testing.T) {
 	buf := MustMarshal(&msg)
 	if m, err := Dump(buf); err != nil {
 		t.Fatalf("Failed to dump: '%v'", err)
-	} else if v, ok := m[1]; !ok {
+	} else if v, ok := m.attributes[1]; !ok {
 		t.Fatalf("Missing filed repeated field '1': '%v'", m)
 	} else if !HasVarints(v, 1, 2, 333, 456789) {
 		t.Fatalf("Missing values for tag '1': '%v'", v)
@@ -38,7 +38,7 @@ func TestMessageWithString(t *testing.T) {
 	buf := MustMarshal(&msg)
 	if m, err := Dump(buf); err != nil {
 		t.Fatalf("Failed to dump: '%v'", err)
-	} else if v, ok := m[1]; !ok {
+	} else if v, ok := m.attributes[1]; !ok {
 		t.Fatalf("Missing required field '1': '%v'", m)
 	} else if !HasStrings(v, name) {
 		t.Fatalf("Incorrect value, expected '%s', got '%s'", name, v)
@@ -60,7 +60,7 @@ func TestMessageWithEmbeddedRepeatedMessageWithString(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to dump: '%v'", err)
 	}
-	v, ok := m[1]
+	v, ok := m.attributes[1]
 	if !ok {
 		t.Fatalf("Missing filed repeated field '1': '%v'", m)
 	} else if len(v) != 2 {
@@ -68,12 +68,12 @@ func TestMessageWithEmbeddedRepeatedMessageWithString(t *testing.T) {
 	}
 	if v0, ok := v[0].(StringerMessage); !ok {
 		t.Fatalf("Expected message, found '%#v'", v[0])
-	} else if !HasStrings(v0[1], name1) {
+	} else if !HasStrings(v0.attributes[1], name1) {
 		t.Fatal("First message expected to have string '%v', got '%v'", name1, v0)
 	}
 	if v1, ok := v[1].(StringerMessage); !ok {
 		t.Fatalf("Expected message, found '%#v'", v[1])
-	} else if !HasStrings(v1[1], name2) {
+	} else if !HasStrings(v1.attributes[1], name2) {
 		t.Fatalf("Second message expected to have string '%v', got '%v'", name2, v1)
 	}
 }
@@ -84,7 +84,7 @@ func TestMessageWithDouble(t *testing.T) {
 	buf := MustMarshal(&msg)
 	if m, err := Dump(buf); err != nil {
 		t.Fatalf("Failed to dump: '%v'", err)
-	} else if v, ok := m[1]; !ok {
+	} else if v, ok := m.attributes[1]; !ok {
 		t.Fatalf("Missing required field '1': '%v'", m)
 	} else if !HasDouble(v, d) {
 		t.Fatalf("Incorrect value, expected '%v', got '%v'", d, v)

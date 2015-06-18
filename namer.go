@@ -23,7 +23,7 @@ func (m NamedMessageRepeated) String() string {
 
 func InjectNames(m StringerMessage, c Context) NamedMessage {
 	ret := make(map[string]fmt.Stringer)
-	for id, val := range m {
+	for id, val := range m.attributes {
 		if !c.Has(id) {
 			continue
 		}
@@ -39,11 +39,22 @@ func InjectNames(m StringerMessage, c Context) NamedMessage {
 			}
 		} else {
 			if c.IsRepeated(id) {
-				ret[c.Name(id)] = val
+				r := make(StringerRepeated, len(val))
+				for i, v := range val {
+					r[i] = convertMessageToString(v)
+				}
+				ret[c.Name(id)] = r
 			} else {
-				ret[c.Name(id)] = val[0]
+				ret[c.Name(id)] = convertMessageToString(val[0])
 			}
 		}
 	}
 	return ret
+}
+
+func convertMessageToString(m fmt.Stringer) fmt.Stringer {
+	if v, ok := m.(StringerMessage); ok {
+		return StringerString(v.rawPayload)
+	}
+	return m
 }
