@@ -2,18 +2,10 @@ package pbdump
 
 import "fmt"
 
-type Kind int
-
-const (
-	Complex Kind = iota
-	Simple
-)
-
-type Field struct {
-	Name     string
-	Kind     Kind
-	Repeated bool
-	Context  Context
+type Field interface {
+	Name() string
+	IsRepeated() bool
+	Context() Context
 }
 
 type Context interface {
@@ -39,21 +31,21 @@ func InjectNames(m StringerMessage, c Context) NamedMessage {
 		if !ok {
 			continue
 		}
-		if field.Kind == Complex {
-			if field.Repeated {
+		if field.Context() != nil {
+			if field.IsRepeated() {
 				r := make(NamedMessageRepeated, len(val))
 				for i, v := range val {
-					r[i] = InjectNames(v.(StringerMessage), field.Context)
+					r[i] = InjectNames(v.(StringerMessage), field.Context())
 				}
-				ret[field.Name] = r
+				ret[field.Name()] = r
 			} else {
-				ret[field.Name] = InjectNames(val[0].(StringerMessage), field.Context)
+				ret[field.Name()] = InjectNames(val[0].(StringerMessage), field.Context())
 			}
 		} else {
-			if field.Repeated {
-				ret[field.Name] = val
+			if field.IsRepeated() {
+				ret[field.Name()] = val
 			} else {
-				ret[field.Name] = val[0]
+				ret[field.Name()] = val[0]
 			}
 		}
 	}
