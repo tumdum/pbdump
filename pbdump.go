@@ -5,10 +5,10 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"strings"
+	// "strings"
 )
 
-type decoder func(io.ByteReader) (fmt.Stringer, error)
+type decoder func(io.ByteReader) (Value, error)
 
 var (
 	decoders []decoder
@@ -18,61 +18,68 @@ func init() {
 	decoders = []decoder{decodeVarint, decodeDouble, decodeLengthDelimited}
 }
 
+type Message map[int][]Value
+
+type Value interface {
+	// Start returns offset in bytes from beggining of message to start to this
+	// value (tag preceding value is not part of the value hence is counted
+	// towards this offset.
+	Start() uint64
+	Payload() []byte
+	String() *string
+	Varint() *uint64
+	Double() *float64
+	Message() *Message
+}
+
+type variant struct {
+	start   uint64
+	str     *string
+	varint  *uint64
+	double  *float64
+	message *Message
+	payload []byte
+}
+
+func (v variant) Start() uint64 {
+	return v.start
+}
+
+func (v variant) String() *string {
+	return v.str
+}
+
+func (v variant) Varint() *uint64 {
+	return v.varint
+}
+
+func (v variant) Double() *float64 {
+	return v.double
+}
+
+func (v variant) Message() *Message {
+	return v.message
+}
+
+func (v variant) Payload() []byte {
+	return v.payload
+}
+
 type key struct {
 	Tag, Type int
 }
 
-type StringerString string
-
-func (s StringerString) String() string {
-	return string(s)
-}
-
-type StringerVarint uint64
-
-func (s StringerVarint) String() string {
-	return fmt.Sprint(uint64(s))
-}
-
-type StringerRepeated []fmt.Stringer
-
-func (s StringerRepeated) String() string {
-	tmp := make([]string, len(s))
-	for i, v := range s {
-		tmp[i] = "'" + v.String() + "'"
-	}
-	return "{" + strings.Join(tmp, ";") + "}"
-}
-
-type StringerMessage struct {
-	attributes map[int]StringerRepeated
-	rawPayload []byte
-}
-
-func (s StringerMessage) String() string {
-	buf := ""
-	for k, v := range s.attributes {
-		buf += fmt.Sprint(k) + " -> " + fmt.Sprint(v) + ", "
-	}
-	return buf
-}
-
-type StringerDouble float64
-
-func (s StringerDouble) String() string {
-	return fmt.Sprint(float64(s))
-}
-
-func Dump(r io.ByteReader) (StringerMessage, error) {
-	if m, err := decodeMessage(r); err != nil {
-		return StringerMessage{}, err
+func Dump(r io.ByteReader) (Value, error) {
+	if val, err := decodeMessage(r); err != nil {
+		return nil, err
 	} else {
-		return m.(StringerMessage), nil
+		return val, nil
 	}
 }
 
-func decodeMessage(r io.ByteReader) (fmt.Stringer, error) {
-	m := StringerMessage{make(map[int]StringerRepeated), nil}
+func decodeMessage(r io.ByteReader) (Value, error) {
+	tmp := make(Message)
+	m := variant{message: &tmp}
 	for {
 		k, err := readKey(r)
 		if err == io.EOF {
@@ -84,20 +91,20 @@ func decodeMessage(r io.ByteReader) (fmt.Stringer, error) {
 		if err != nil {
 			return nil, err
 		}
-		if s, ok := m.attributes[k.Tag]; ok {
-			m.attributes[k.Tag] = append(s, v)
+		if s, ok := (*m.Message())[k.Tag]; ok {
+			(*m.Message())[k.Tag] = append(s, v)
 		} else {
-			m.attributes[k.Tag] = StringerRepeated{v}
+			(*m.Message())[k.Tag] = []Value{v}
 		}
 	}
 	return m, nil
 }
 
-func decodeVarint(r io.ByteReader) (fmt.Stringer, error) {
+func decodeVarint(r io.ByteReader) (Value, error) {
 	if n, err := binary.ReadUvarint(r); err != nil {
 		return nil, err
 	} else {
-		return StringerVarint(n), nil
+		return variant{varint: &n}, nil
 	}
 }
 
@@ -116,7 +123,7 @@ func (r *ByteReaderReader) Read(b []byte) (int, error) {
 	return len(b), nil
 }
 
-func decodeLengthDelimited(r io.ByteReader) (fmt.Stringer, error) {
+func decodeLengthDelimited(r io.ByteReader) (Value, error) {
 	if l, err := binary.ReadUvarint(r); err != nil {
 		return nil, err
 	} else {
@@ -129,20 +136,21 @@ func decodeLengthDelimited(r io.ByteReader) (fmt.Stringer, error) {
 		}
 		buf := bytes.NewBuffer(b)
 		if msg, err := decodeMessage(buf); err != nil {
-			return StringerString(string(b)), nil
+			s := string(b)
+			return variant{str: &s}, nil
 		} else {
 			return msg, nil
 		}
 	}
 }
 
-func decodeDouble(r io.ByteReader) (fmt.Stringer, error) {
+func decodeDouble(r io.ByteReader) (Value, error) {
 	fullReader := ByteReaderReader{r}
 	var d float64
 	if err := binary.Read(&fullReader, binary.LittleEndian, &d); err != nil {
 		return nil, err
 	} else {
-		return StringerDouble(d), nil
+		return variant{double: &d}, nil
 	}
 }
 

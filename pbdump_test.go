@@ -13,7 +13,9 @@ func TestMessageWithInt(t *testing.T) {
 	buf := MustMarshal(&msg)
 	if m, err := Dump(buf); err != nil {
 		t.Fatalf("Failed to dump: '%v'", err)
-	} else if v, ok := m.attributes[1]; !ok {
+	} else if m.Message() == nil {
+		t.Fatalf("Expected to decode message, got '%v'", m)
+	} else if v, ok := (*m.Message())[1]; !ok {
 		t.Fatalf("Missing required field '1': '%v'", m)
 	} else if !HasVarints(v, 42) {
 		t.Fatalf("Incorrect value for field, expected '%v', got '%v'", 42, v)
@@ -25,7 +27,7 @@ func TestMessageWithRepeatedInt(t *testing.T) {
 	buf := MustMarshal(&msg)
 	if m, err := Dump(buf); err != nil {
 		t.Fatalf("Failed to dump: '%v'", err)
-	} else if v, ok := m.attributes[1]; !ok {
+	} else if v, ok := (*m.Message())[1]; !ok {
 		t.Fatalf("Missing filed repeated field '1': '%v'", m)
 	} else if !HasVarints(v, 1, 2, 333, 456789) {
 		t.Fatalf("Missing values for tag '1': '%v'", v)
@@ -38,7 +40,7 @@ func TestMessageWithString(t *testing.T) {
 	buf := MustMarshal(&msg)
 	if m, err := Dump(buf); err != nil {
 		t.Fatalf("Failed to dump: '%v'", err)
-	} else if v, ok := m.attributes[1]; !ok {
+	} else if v, ok := (*m.Message())[1]; !ok {
 		t.Fatalf("Missing required field '1': '%v'", m)
 	} else if !HasStrings(v, name) {
 		t.Fatalf("Incorrect value, expected '%s', got '%s'", name, v)
@@ -60,21 +62,19 @@ func TestMessageWithEmbeddedRepeatedMessageWithString(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to dump: '%v'", err)
 	}
-	v, ok := m.attributes[1]
-	if !ok {
-		t.Fatalf("Missing filed repeated field '1': '%v'", m)
-	} else if len(v) != 2 {
+	v := (*m.Message())[1]
+	if len(v) != 2 {
 		t.Fatalf("Expected to have to repeated messages, got: '%d' (%v)", len(v), v)
 	}
-	if v0, ok := v[0].(StringerMessage); !ok {
+	if m0 := v[0].Message(); m0 == nil {
 		t.Fatalf("Expected message, found '%#v'", v[0])
-	} else if !HasStrings(v0.attributes[1], name1) {
-		t.Fatal("First message expected to have string '%v', got '%v'", name1, v0)
+	} else if !HasStrings((*m0)[1], name1) {
+		t.Fatal("First message expected to have string '%v', got '%v'", name1, m0)
 	}
-	if v1, ok := v[1].(StringerMessage); !ok {
+	if m1 := v[1].Message(); m1 == nil {
 		t.Fatalf("Expected message, found '%#v'", v[1])
-	} else if !HasStrings(v1.attributes[1], name2) {
-		t.Fatalf("Second message expected to have string '%v', got '%v'", name2, v1)
+	} else if !HasStrings((*m1)[1], name2) {
+		t.Fatalf("Second message expected to have string '%v', got '%v'", name2, m1)
 	}
 }
 
@@ -84,54 +84,54 @@ func TestMessageWithDouble(t *testing.T) {
 	buf := MustMarshal(&msg)
 	if m, err := Dump(buf); err != nil {
 		t.Fatalf("Failed to dump: '%v'", err)
-	} else if v, ok := m.attributes[1]; !ok {
+	} else if v, ok := (*m.Message())[1]; !ok {
 		t.Fatalf("Missing required field '1': '%v'", m)
 	} else if !HasDouble(v, d) {
 		t.Fatalf("Incorrect value, expected '%v', got '%v'", d, v)
 	}
 }
-func HasVarints(actual StringerRepeated, expected ...uint64) bool {
+
+func HasDouble(actual []Value, expected ...float64) bool {
 	if len(actual) != len(expected) {
 		return false
 	}
 	for i, _ := range actual {
-		if v, ok := actual[i].(StringerVarint); !ok {
+		if d := actual[i].Double(); d == nil {
 			return false
-		} else if uint64(v) != expected[i] {
+		} else if *d != expected[i] {
 			return false
 		}
 	}
 	return true
 }
 
-func HasStrings(actual StringerRepeated, expected ...string) bool {
+func HasVarints(actual []Value, expected ...uint64) bool {
 	if len(actual) != len(expected) {
 		return false
 	}
 	for i, _ := range actual {
-		if v, ok := actual[i].(StringerString); !ok {
+		if vp := actual[i].Varint(); vp == nil {
 			return false
-		} else if string(v) != expected[i] {
+		} else if *vp != expected[i] {
 			return false
 		}
 	}
 	return true
 }
 
-func HasDouble(actual StringerRepeated, expected ...float64) bool {
+func HasStrings(actual []Value, expected ...string) bool {
 	if len(actual) != len(expected) {
 		return false
 	}
 	for i, _ := range actual {
-		if v, ok := actual[i].(StringerDouble); !ok {
+		if s := actual[i].String(); s == nil {
 			return false
-		} else if float64(v) != expected[i] {
+		} else if *s != expected[i] {
 			return false
 		}
 	}
 	return true
 }
-
 func MustMarshal(msg proto.Message) io.ByteReader {
 	b, err := proto.Marshal(msg)
 	if err != nil {

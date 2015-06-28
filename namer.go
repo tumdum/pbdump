@@ -1,5 +1,6 @@
 package pbdump
 
+/*
 import "fmt"
 
 type Context interface {
@@ -58,3 +59,4 @@ func convertMessageToString(m fmt.Stringer) fmt.Stringer {
 	}
 	return m
 }
+*/
