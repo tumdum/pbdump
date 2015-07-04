@@ -15,22 +15,27 @@ func TestMessageWithInt(t *testing.T) {
 		t.Fatalf("Failed to dump: '%v'", err)
 	} else if m.Message() == nil {
 		t.Fatalf("Expected to decode message, got '%v'", m)
-	} else if v, ok := (*m.Message())[1]; !ok {
+	} else if v, ok := m.Message().Get(1); !ok {
 		t.Fatalf("Missing required field '1': '%v'", m)
 	} else if !HasVarints(v, 42) {
 		t.Fatalf("Incorrect value for field, expected '%v', got '%v'", 42, v)
+	} else if v[0].Start() != 1 {
+		t.Fatalf("Incorrect start offset, expected 1, got '%v'", v[0].Start())
 	}
 }
 
 func TestMessageWithRepeatedInt(t *testing.T) {
 	msg := MessageWithRepeatedInt{Ids: []int32{1, 2, 333, 456789}}
 	buf := MustMarshal(&msg)
+	expectedOffsets := []uint64{1, 3, 5, 8}
 	if m, err := Dump(buf); err != nil {
 		t.Fatalf("Failed to dump: '%v'", err)
-	} else if v, ok := (*m.Message())[1]; !ok {
+	} else if v, ok := m.Message().Get(1); !ok {
 		t.Fatalf("Missing filed repeated field '1': '%v'", m)
 	} else if !HasVarints(v, 1, 2, 333, 456789) {
 		t.Fatalf("Missing values for tag '1': '%v'", v)
+	} else {
+		HasCorrectStarts(t, v, expectedOffsets)
 	}
 }
 
@@ -40,10 +45,12 @@ func TestMessageWithString(t *testing.T) {
 	buf := MustMarshal(&msg)
 	if m, err := Dump(buf); err != nil {
 		t.Fatalf("Failed to dump: '%v'", err)
-	} else if v, ok := (*m.Message())[1]; !ok {
+	} else if v, ok := m.Message().Get(1); !ok {
 		t.Fatalf("Missing required field '1': '%v'", m)
 	} else if !HasStrings(v, name) {
 		t.Fatalf("Incorrect value, expected '%s', got '%s'", name, v)
+	} else if v[0].Start() != 1 {
+		t.Fatalf("Expected offset 1, got %d", v[0].Start())
 	}
 }
 
@@ -62,19 +69,27 @@ func TestMessageWithEmbeddedRepeatedMessageWithString(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to dump: '%v'", err)
 	}
-	v := (*m.Message())[1]
+	v, _ := m.Message().Get(1)
 	if len(v) != 2 {
 		t.Fatalf("Expected to have to repeated messages, got: '%d' (%v)", len(v), v)
 	}
 	if m0 := v[0].Message(); m0 == nil {
 		t.Fatalf("Expected message, found '%#v'", v[0])
-	} else if !HasStrings((*m0)[1], name1) {
+	} else if !HasStrings(mustGet(m0, 1), name1) {
 		t.Fatal("First message expected to have string '%v', got '%v'", name1, m0)
+	} else if v[0].Start() != 1 {
+		t.Fatalf("First message expected to start at 1, got %d", v[0].Start())
+	} else if mustGet(m0, 1)[0].Start() != 3 {
+		t.Fatalf("String from first message expected to start at 3, got %d", mustGet(m0, 1)[0].Start())
 	}
 	if m1 := v[1].Message(); m1 == nil {
 		t.Fatalf("Expected message, found '%#v'", v[1])
-	} else if !HasStrings((*m1)[1], name2) {
+	} else if !HasStrings(mustGet(m1, 1), name2) {
 		t.Fatalf("Second message expected to have string '%v', got '%v'", name2, m1)
+	} else if v[1].Start() != 10 {
+		t.Fatalf("Second message expected to start at 10, got %d", v[1].Start())
+	} else if mustGet(m1, 1)[0].Start() != 12 {
+		t.Fatalf("String from second message expected to start at 12, got %d", mustGet(m1, 1)[0].Start())
 	}
 }
 
@@ -84,10 +99,12 @@ func TestMessageWithDouble(t *testing.T) {
 	buf := MustMarshal(&msg)
 	if m, err := Dump(buf); err != nil {
 		t.Fatalf("Failed to dump: '%v'", err)
-	} else if v, ok := (*m.Message())[1]; !ok {
+	} else if v, ok := m.Message().Get(1); !ok {
 		t.Fatalf("Missing required field '1': '%v'", m)
 	} else if !HasDouble(v, d) {
 		t.Fatalf("Incorrect value, expected '%v', got '%v'", d, v)
+	} else if v[0].Start() != 1 {
+		t.Fatalf("Expected that double starts at 1, got %d", v[0].Start())
 	}
 }
 
@@ -138,4 +155,20 @@ func MustMarshal(msg proto.Message) io.ByteReader {
 		panic(err)
 	}
 	return bytes.NewBuffer(b)
+}
+
+func mustGet(m *Message, id int) []Value {
+	if v, ok := m.Get(id); ok {
+		return v
+	} else {
+		panic("Failed to get field from message")
+	}
+}
+
+func HasCorrectStarts(t *testing.T, v []Value, expected []uint64) {
+	for i, start := range expected {
+		if v[i].Start() != start {
+			t.Fatalf("Field %d: expected start %d, got %d", i, start, v[i].Start())
+		}
+	}
 }

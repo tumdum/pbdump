@@ -1,8 +1,6 @@
 package pbdump
 
 /*
-import "fmt"
-
 type Context interface {
 	Has(id int) bool
 	Name(id int) string
@@ -10,37 +8,37 @@ type Context interface {
 	Context(id int) Context
 }
 
-type NamedMessage map[string]fmt.Stringer
+type NamedValue
 
-func (m NamedMessage) String() string {
-	return fmt.Sprint(map[string]fmt.Stringer(m))
+type namedVariant struct {
+	Value
+	names map[int]string
 }
 
-type NamedMessageRepeated []NamedMessage
-
-func (m NamedMessageRepeated) String() string {
-	return fmt.Sprint([]NamedMessage(m))
+func (m *NamedMessage) connect(id int, name string) {
+	m.names[id] = name
 }
 
-func InjectNames(m StringerMessage, c Context) NamedMessage {
-	ret := make(map[string]fmt.Stringer)
-	for id, val := range m.attributes {
+func InjectNames(v Value, c Context) NamedMessage {
+	ret := namedVariant{v, make(map[int]string)}
+	for id, val := range *v.Message() {
 		if !c.Has(id) {
 			continue
 		}
 		if c.Context(id) != nil {
 			if c.IsRepeated(id) {
-				r := make(NamedMessageRepeated, len(val))
+				r := make([]Value, len(val))
 				for i, v := range val {
-					r[i] = InjectNames(v.(StringerMessage), c.Context(id))
+					r[i] = InjectNames(v, c.Context(id))
 				}
 				ret[c.Name(id)] = r
+				ret.connect(id, c.Name(id))
 			} else {
-				ret[c.Name(id)] = InjectNames(val[0].(StringerMessage), c.Context(id))
+				ret[c.Name(id)] = InjectNames(val[0], c.Context(id))
 			}
 		} else {
 			if c.IsRepeated(id) {
-				r := make(StringerRepeated, len(val))
+				r := make([]Value, len(val))
 				for i, v := range val {
 					r[i] = convertMessageToString(v)
 				}
@@ -50,12 +48,12 @@ func InjectNames(m StringerMessage, c Context) NamedMessage {
 			}
 		}
 	}
-	return ret
+	return varint{message: ret}
 }
 
-func convertMessageToString(m fmt.Stringer) fmt.Stringer {
-	if v, ok := m.(StringerMessage); ok {
-		return StringerString(v.rawPayload)
+func convertMessageToString(m Value) Value {
+	if m.Message() != nil {
+		return varint{str: string(m.Payload()), payload: m.Payload()}
 	}
 	return m
 }

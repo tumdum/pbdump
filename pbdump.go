@@ -5,10 +5,9 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	// "strings"
 )
 
-type decoder func(io.ByteReader) (Value, error)
+type decoder func(*countingByteReader) (Value, error)
 
 var (
 	decoders []decoder
@@ -18,7 +17,23 @@ func init() {
 	decoders = []decoder{decodeVarint, decodeDouble, decodeLengthDelimited}
 }
 
-type Message map[int][]Value
+type Message struct {
+	m map[int][]Value
+}
+
+func (m Message) Get(id int) ([]Value, bool) {
+	v, ok := m.m[id]
+	return v, ok
+}
+
+func (m *Message) add(id int, v ...Value) {
+	old, ok := m.m[id]
+	if ok {
+		m.m[id] = append(old, v...)
+	} else {
+		m.m[id] = v
+	}
+}
 
 type Value interface {
 	// Start returns offset in bytes from beggining of message to start to this
@@ -69,17 +84,31 @@ type key struct {
 	Tag, Type int
 }
 
+type countingByteReader struct {
+	r     io.ByteReader
+	total uint64
+}
+
+func (r *countingByteReader) ReadByte() (byte, error) {
+	b, err := r.r.ReadByte()
+	if err == nil {
+		r.total += 1
+	}
+	return b, err
+}
+
 func Dump(r io.ByteReader) (Value, error) {
-	if val, err := decodeMessage(r); err != nil {
+	reader := countingByteReader{r, 0}
+	if val, err := decodeMessage(&reader); err != nil {
 		return nil, err
 	} else {
 		return val, nil
 	}
 }
 
-func decodeMessage(r io.ByteReader) (Value, error) {
-	tmp := make(Message)
-	m := variant{message: &tmp}
+func decodeMessage(r *countingByteReader) (Value, error) {
+	tmp := Message{make(map[int][]Value)}
+	m := variant{message: &tmp, start: r.total}
 	for {
 		k, err := readKey(r)
 		if err == io.EOF {
@@ -91,20 +120,21 @@ func decodeMessage(r io.ByteReader) (Value, error) {
 		if err != nil {
 			return nil, err
 		}
-		if s, ok := (*m.Message())[k.Tag]; ok {
-			(*m.Message())[k.Tag] = append(s, v)
+		if _, ok := m.Message().Get(k.Tag); ok {
+			m.Message().add(k.Tag, v)
 		} else {
-			(*m.Message())[k.Tag] = []Value{v}
+			m.Message().add(k.Tag, v)
 		}
 	}
 	return m, nil
 }
 
-func decodeVarint(r io.ByteReader) (Value, error) {
+func decodeVarint(r *countingByteReader) (Value, error) {
+	start := r.total
 	if n, err := binary.ReadUvarint(r); err != nil {
 		return nil, err
 	} else {
-		return variant{varint: &n}, nil
+		return variant{varint: &n, start: start}, nil
 	}
 }
 
@@ -123,10 +153,12 @@ func (r *ByteReaderReader) Read(b []byte) (int, error) {
 	return len(b), nil
 }
 
-func decodeLengthDelimited(r io.ByteReader) (Value, error) {
+func decodeLengthDelimited(r *countingByteReader) (Value, error) {
+	start := r.total
 	if l, err := binary.ReadUvarint(r); err != nil {
 		return nil, err
 	} else {
+		sub := r.total
 		b := make([]byte, l)
 		fullReader := ByteReaderReader{r}
 		if n, err := fullReader.Read(b); err != nil {
@@ -135,22 +167,26 @@ func decodeLengthDelimited(r io.ByteReader) (Value, error) {
 			return nil, fmt.Errorf("Too little data")
 		}
 		buf := bytes.NewBuffer(b)
-		if msg, err := decodeMessage(buf); err != nil {
+		reader := countingByteReader{buf, sub}
+		if msg, err := decodeMessage(&reader); err != nil {
 			s := string(b)
-			return variant{str: &s}, nil
+			return variant{str: &s, start: start}, nil
 		} else {
-			return msg, nil
+			m := msg.(variant)
+			m.start = start
+			return m, nil
 		}
 	}
 }
 
-func decodeDouble(r io.ByteReader) (Value, error) {
+func decodeDouble(r *countingByteReader) (Value, error) {
+	start := r.total
 	fullReader := ByteReaderReader{r}
 	var d float64
 	if err := binary.Read(&fullReader, binary.LittleEndian, &d); err != nil {
 		return nil, err
 	} else {
-		return variant{double: &d}, nil
+		return variant{double: &d, start: start}, nil
 	}
 }
 
