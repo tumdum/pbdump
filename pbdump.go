@@ -40,7 +40,7 @@ type Value interface {
 	// value (tag preceding value is not part of the value hence is counted
 	// towards this offset.
 	Start() uint64
-	Payload() []byte
+	Length() uint64
 	String() *string
 	Varint() *uint64
 	Double() *float64
@@ -53,7 +53,7 @@ type variant struct {
 	varint  *uint64
 	double  *float64
 	message *Message
-	payload []byte
+	length  uint64
 }
 
 func (v variant) Start() uint64 {
@@ -76,8 +76,8 @@ func (v variant) Message() *Message {
 	return v.message
 }
 
-func (v variant) Payload() []byte {
-	return v.payload
+func (v variant) Length() uint64 {
+	return v.length
 }
 
 type key struct {
@@ -134,7 +134,8 @@ func decodeVarint(r *countingByteReader) (Value, error) {
 	if n, err := binary.ReadUvarint(r); err != nil {
 		return nil, err
 	} else {
-		return variant{varint: &n, start: start}, nil
+		end := r.total
+		return variant{varint: &n, start: start, length: (end - start)}, nil
 	}
 }
 
@@ -170,10 +171,11 @@ func decodeLengthDelimited(r *countingByteReader) (Value, error) {
 		reader := countingByteReader{buf, sub}
 		if msg, err := decodeMessage(&reader); err != nil {
 			s := string(b)
-			return variant{str: &s, start: start}, nil
+			return variant{str: &s, start: start, length: (sub - start) + uint64(len(b))}, nil
 		} else {
 			m := msg.(variant)
 			m.start = start
+			m.length = (sub - start) + uint64(len(b))
 			return m, nil
 		}
 	}
@@ -181,12 +183,12 @@ func decodeLengthDelimited(r *countingByteReader) (Value, error) {
 
 func decodeDouble(r *countingByteReader) (Value, error) {
 	start := r.total
-	fullReader := ByteReaderReader{r}
+	reader := ByteReaderReader{r}
 	var d float64
-	if err := binary.Read(&fullReader, binary.LittleEndian, &d); err != nil {
+	if err := binary.Read(&reader, binary.LittleEndian, &d); err != nil {
 		return nil, err
 	} else {
-		return variant{double: &d, start: start}, nil
+		return variant{double: &d, start: start, length: 8}, nil
 	}
 }
 
@@ -204,4 +206,10 @@ func readKey(r io.ByteReader) (key, error) {
 
 func isSupportedWireType(t int) bool {
 	return (t >= 0) && (t < len(decoders)) && (decoders[t] != nil)
+}
+
+func lengthDelimitedPayload(msg []byte) []byte {
+	b := make([]byte, 10)
+	n := binary.PutUvarint(b, uint64(len(msg)))
+	return append(b[:n], msg...)
 }

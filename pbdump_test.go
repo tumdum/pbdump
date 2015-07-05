@@ -28,6 +28,7 @@ func TestMessageWithRepeatedInt(t *testing.T) {
 	msg := MessageWithRepeatedInt{Ids: []int32{1, 2, 333, 456789}}
 	buf := MustMarshal(&msg)
 	expectedOffsets := []uint64{1, 3, 5, 8}
+	expectedLengths := []uint64{1, 1, 2, 3}
 	if m, err := Dump(buf); err != nil {
 		t.Fatalf("Failed to dump: '%v'", err)
 	} else if v, ok := m.Message().Get(1); !ok {
@@ -36,6 +37,7 @@ func TestMessageWithRepeatedInt(t *testing.T) {
 		t.Fatalf("Missing values for tag '1': '%v'", v)
 	} else {
 		HasCorrectStarts(t, v, expectedOffsets)
+		HasCorrectLength(t, v, expectedLengths)
 	}
 }
 
@@ -51,6 +53,8 @@ func TestMessageWithString(t *testing.T) {
 		t.Fatalf("Incorrect value, expected '%s', got '%s'", name, v)
 	} else if v[0].Start() != 1 {
 		t.Fatalf("Expected offset 1, got %d", v[0].Start())
+	} else if v[0].Length() != uint64(len(name)+1) {
+		t.Fatalf("Incorrect length")
 	}
 }
 
@@ -96,7 +100,11 @@ func TestMessageWithEmbeddedRepeatedMessageWithString(t *testing.T) {
 func TestMessageWithDouble(t *testing.T) {
 	d := float64(3.14159)
 	msg := MessageWithDouble{D: &d}
-	buf := MustMarshal(&msg)
+	b, err := proto.Marshal(&msg)
+	if err != nil {
+		panic(err)
+	}
+	buf := bytes.NewBuffer(b)
 	if m, err := Dump(buf); err != nil {
 		t.Fatalf("Failed to dump: '%v'", err)
 	} else if v, ok := m.Message().Get(1); !ok {
@@ -105,6 +113,8 @@ func TestMessageWithDouble(t *testing.T) {
 		t.Fatalf("Incorrect value, expected '%v', got '%v'", d, v)
 	} else if v[0].Start() != 1 {
 		t.Fatalf("Expected that double starts at 1, got %d", v[0].Start())
+	} else if v[0].Length() != 8 {
+		t.Fatalf("Incorrect length")
 	}
 }
 
@@ -169,6 +179,14 @@ func HasCorrectStarts(t *testing.T, v []Value, expected []uint64) {
 	for i, start := range expected {
 		if v[i].Start() != start {
 			t.Fatalf("Field %d: expected start %d, got %d", i, start, v[i].Start())
+		}
+	}
+}
+
+func HasCorrectLength(t *testing.T, v []Value, expected []uint64) {
+	for i, length := range expected {
+		if v[i].Length() != length {
+			t.Fatalf("Field %d: expected length %d, got %d", i, length, v[i].Length())
 		}
 	}
 }
