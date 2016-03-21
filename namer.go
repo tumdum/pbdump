@@ -3,7 +3,6 @@ package pbdump
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"strings"
 )
 
@@ -59,7 +58,6 @@ func InjectNames(m StringerMessage, c Context) NamedMessage {
 				}
 				ret[field.Name()] = r
 			} else {
-				log.Printf("%#v %T\n", val[0], val[0])
 				switch v := val[0].(type) {
 				case StringerString, StringerDouble, StringerVarint:
 					ret[field.Name()] = v
