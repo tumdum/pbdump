@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 )
 
@@ -36,6 +37,10 @@ func (s StringerVarint) String() string {
 
 type StringerRepeated []fmt.Stringer
 
+func (s *StringerRepeated) MarshalJSON() ([]byte, error) {
+	return []byte("XXXXX"), nil
+}
+
 func (s StringerRepeated) String() string {
 	tmp := make([]string, len(s))
 	for i, v := range s {
@@ -44,13 +49,21 @@ func (s StringerRepeated) String() string {
 	return "{" + strings.Join(tmp, ";") + "}"
 }
 
-type StringerMessage map[int]StringerRepeated
+type StringerMessage struct {
+	attributes map[int]StringerRepeated
+	rawPayload []byte
+}
+
+func (s StringerMessage) MarshalJSON() ([]byte, error) {
+	return []byte("YYYYY"), nil
+}
 
 func (s StringerMessage) String() string {
 	buf := ""
-	for k, v := range s {
+	for k, v := range s.attributes {
 		buf += fmt.Sprint(k) + " -> " + fmt.Sprint(v) + ", "
 	}
+	buf += "raw: " + fmt.Sprint(string(s.rawPayload))
 	return buf
 }
 
@@ -62,14 +75,14 @@ func (s StringerDouble) String() string {
 
 func Dump(r io.ByteReader) (StringerMessage, error) {
 	if m, err := decodeMessage(r); err != nil {
-		return nil, err
+		return StringerMessage{}, err
 	} else {
 		return m.(StringerMessage), nil
 	}
 }
 
 func decodeMessage(r io.ByteReader) (fmt.Stringer, error) {
-	m := make(StringerMessage)
+	m := StringerMessage{make(map[int]StringerRepeated), nil}
 	for {
 		k, err := readKey(r)
 		if err == io.EOF {
@@ -81,10 +94,10 @@ func decodeMessage(r io.ByteReader) (fmt.Stringer, error) {
 		if err != nil {
 			return nil, err
 		}
-		if s, ok := m[k.Tag]; ok {
-			m[k.Tag] = append(s, v)
+		if s, ok := m.attributes[k.Tag]; ok {
+			m.attributes[k.Tag] = append(s, v)
 		} else {
-			m[k.Tag] = StringerRepeated{v}
+			m.attributes[k.Tag] = StringerRepeated{v}
 		}
 	}
 	return m, nil
@@ -125,10 +138,14 @@ func decodeLengthDelimited(r io.ByteReader) (fmt.Stringer, error) {
 			return nil, fmt.Errorf("Too little data")
 		}
 		buf := bytes.NewBuffer(b)
+		raw := make([]byte, len(b))
+		copy(raw, b)
 		if msg, err := decodeMessage(buf); err != nil {
 			return StringerString(string(b)), nil
 		} else {
-			return msg, nil
+			smsg, _ := msg.(StringerMessage)
+			smsg.rawPayload = raw
+			return smsg, nil
 		}
 	}
 }
@@ -157,4 +174,13 @@ func readKey(r io.ByteReader) (key, error) {
 
 func isSupportedWireType(t int) bool {
 	return (t >= 0) && (t < len(decoders)) && (decoders[t] != nil)
+}
+
+func isPrintable(s string) bool {
+	for _, r := range s {
+		if !strconv.IsPrint(r) {
+			return false
+		}
+	}
+	return true
 }
