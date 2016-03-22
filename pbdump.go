@@ -37,10 +37,6 @@ func (s StringerVarint) String() string {
 
 type StringerRepeated []fmt.Stringer
 
-func (s *StringerRepeated) MarshalJSON() ([]byte, error) {
-	return []byte("XXXXX"), nil
-}
-
 func (s StringerRepeated) String() string {
 	tmp := make([]string, len(s))
 	for i, v := range s {
@@ -52,10 +48,6 @@ func (s StringerRepeated) String() string {
 type StringerMessage struct {
 	attributes map[int]StringerRepeated
 	rawPayload []byte
-}
-
-func (s StringerMessage) MarshalJSON() ([]byte, error) {
-	return []byte("YYYYY"), nil
 }
 
 func (s StringerMessage) String() string {
