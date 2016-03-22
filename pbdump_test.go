@@ -1,13 +1,6 @@
 package pbdump
 
-import (
-	"bytes"
-	"io"
-	"testing"
-
-	"github.com/golang/protobuf/proto"
-)
-
+/*
 func TestMessageWithInt(t *testing.T) {
 	msg := MessageWithInt{Id: proto.Int32(42)}
 	buf := MustMarshal(&msg)
@@ -139,3 +132,4 @@ func MustMarshal(msg proto.Message) io.ByteReader {
 	}
 	return bytes.NewBuffer(b)
 }
+*/

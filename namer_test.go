@@ -28,8 +28,12 @@ func (f FieldDescriptor) Context() Context {
 }
 
 func TestNamingOfMessageWithInt(t *testing.T) {
-	m := make(StringerMessage)
-	m[1] = StringerRepeated{StringerVarint(42)}
+	m := StringerMessage{
+		attributes: map[int]StringerRepeated{
+			1: StringerRepeated{StringerVarint(42)},
+		},
+		rawPayload: nil,
+	}
 	c := make(SimpleContext)
 	c[1] = FieldDescriptor{
 		name: "foo", isRepeated: false, context: nil,
@@ -45,9 +49,11 @@ func TestNamingOfMessageWithInt(t *testing.T) {
 }
 
 func TestNamingOfMessageWithRepeatedInt(t *testing.T) {
-	m := make(StringerMessage)
-	m[2] = StringerRepeated{
-		StringerVarint(42), StringerVarint(55),
+	m := StringerMessage{
+		attributes: map[int]StringerRepeated{
+			2: StringerRepeated{StringerVarint(42), StringerVarint(55)},
+		},
+		rawPayload: nil,
 	}
 	c := make(SimpleContext)
 	c[2] = FieldDescriptor{
@@ -66,14 +72,25 @@ func TestNamingOfMessageWithRepeatedInt(t *testing.T) {
 }
 
 func TestNamingOfMessageWithMessage(t *testing.T) {
-	m1 := make(StringerMessage)
-	m2 := make(StringerMessage)
-	root := make(StringerMessage)
-
-	m1[1] = StringerRepeated{StringerVarint(42)}
-	m2[1] = StringerRepeated{StringerString("test")}
-	root[1] = StringerRepeated{m1}
-	root[2] = StringerRepeated{m2}
+	m1 := StringerMessage{
+		attributes: map[int]StringerRepeated{
+			1: StringerRepeated{StringerVarint(42)},
+		},
+		rawPayload: nil,
+	}
+	m2 := StringerMessage{
+		attributes: map[int]StringerRepeated{
+			1: StringerRepeated{StringerString("test")},
+		},
+		rawPayload: nil,
+	}
+	root := StringerMessage{
+		attributes: map[int]StringerRepeated{
+			1: StringerRepeated{m1},
+			2: StringerRepeated{m2},
+		},
+		rawPayload: nil,
+	}
 
 	c1 := make(SimpleContext)
 	c2 := make(SimpleContext)
@@ -112,14 +129,26 @@ func TestNamingOfMessageWithMessage(t *testing.T) {
 }
 
 func TestNamingOfMessageWithRepeatedMessage(t *testing.T) {
-	m1 := make(StringerMessage)
-	m1[1] = StringerRepeated{StringerVarint(42)}
+	m1 := StringerMessage{
+		attributes: map[int]StringerRepeated{
+			1: StringerRepeated{StringerVarint(42)},
+		},
+		rawPayload: nil,
+	}
 
-	m2 := make(StringerMessage)
-	m2[1] = StringerRepeated{StringerVarint(55)}
+	m2 := StringerMessage{
+		attributes: map[int]StringerRepeated{
+			1: StringerRepeated{StringerVarint(55)},
+		},
+		rawPayload: nil,
+	}
 
-	root := make(StringerMessage)
-	root[1] = StringerRepeated{m1, m2}
+	root := StringerMessage{
+		attributes: map[int]StringerRepeated{
+			1: StringerRepeated{m1, m2},
+		},
+		rawPayload: nil,
+	}
 
 	c1 := make(SimpleContext)
 	c1[1] = FieldDescriptor{
@@ -138,7 +167,7 @@ func TestNamingOfMessageWithRepeatedMessage(t *testing.T) {
 		t.Fatalf("Expected repeated, got: '%v'", out)
 	} else if len(v) != 2 {
 		t.Fatalf("Expected slice of two, got: '%v'", v)
-	} else if v[0]["id"].(StringerVarint) != 42 || v[1]["id"].(StringerVarint) != 55 {
+	} else if v[0].(NamedMessage)["id"].(StringerVarint) != 42 || v[1].(NamedMessage)["id"].(StringerVarint) != 55 {
 		t.Fatalf("Expected 42 and 55, got '%v'", v)
 	}
 }
